@@ -80,11 +80,26 @@ export default class Channel extends EventEmitter
    */
   createTlsClient(config)
   {
-    const socket = tls.connect(config)
-    this.init(socket)
-    socket.on('data', this.buffer.bind(this, socket))
-    socket.setKeepAlive(true, this.config.KEEP_ALIVE)
-    return socket
+    return new Promise((accept, reject) =>
+    {
+      const socket = tls.connect(config)
+      this.init(socket)
+
+      socket.setKeepAlive(true, this.config.KEEP_ALIVE)
+      socket.on('data', this.buffer.bind(this, socket))
+      socket.once('error', (reason) =>
+      {
+        const error = new Error('Could not connect to server')
+        error.code  = 'E_TCP_RECORD_CHANNEL_CLIENT_CONNECT'
+        error.cause = reason
+        reject(error)
+      })
+      socket.once('secureConnect', () => 
+      {
+        socket.removeAllListeners('error')
+        accept(socket)
+      })
+    })
   }
 
   /**
@@ -93,11 +108,26 @@ export default class Channel extends EventEmitter
    */
   createNetClient(config)
   {
-    const socket = net.connect(config)
-    this.init(socket)
-    socket.on('data', this.buffer.bind(this, socket))
-    socket.setKeepAlive(true, this.config.KEEP_ALIVE)
-    return socket
+    new Promise((accept, reject) =>
+    {
+      const socket = net.connect(config)
+      this.init(socket)
+
+      socket.setKeepAlive(true, this.config.KEEP_ALIVE)
+      socket.on('data', this.buffer.bind(this, socket))
+      socket.once('error', (reason) =>
+      {
+        const error = new Error('Could not connect to server')
+        error.code  = 'E_TCP_RECORD_CHANNEL_CLIENT_CONNECT'
+        error.cause = reason
+        reject(error)
+      })
+      socket.once('connect', () => 
+      {
+        socket.removeAllListeners('error')
+        accept(socket)
+      })
+    })
   }
 
   /**
@@ -177,7 +207,7 @@ export default class Channel extends EventEmitter
    * @param {tls.TLSSocket} socket
    * @param {string[]} units
    * @returns {void}
-   * @throws {Error} E_TLS_TRANSMIT
+   * @throws {Error} E_TCP_RECORD_CHANNEL_TRANSMIT
    */
   transmit(socket, units)
   {
@@ -189,7 +219,7 @@ export default class Channel extends EventEmitter
     }
     catch(error)
     {
-      if('E_TLS_TRANSMIT' === error.code)
+      if('E_TCP_RECORD_CHANNEL_TRANSMIT' === error.code)
       {
         error.record = units
       }
@@ -204,7 +234,7 @@ export default class Channel extends EventEmitter
    * @param {tls.TLSSocket[]} sockets
    * @param {string[]} units
    * @returns {void}
-   * @throws {Error} E_TLS_BROADCAST
+   * @throws {Error} E_TCP_RECORD_CHANNEL_BROADCAST
    */
   broadcast(sockets, units)
   {
@@ -227,7 +257,7 @@ export default class Channel extends EventEmitter
     if(reasons.length)
     {
       const error  = new Error('Could not broadcast record to all sockets')
-      error.code   = 'E_TLS_BROADCAST'
+      error.code   = 'E_TCP_RECORD_CHANNEL_BROADCAST'
       error.record = units
       error.cause  = reasons
       throw error
@@ -243,7 +273,7 @@ export default class Channel extends EventEmitter
     else
     {
       const error = new Error('Could not write record to socket')
-      error.code  = 'E_TLS_TRANSMIT'
+      error.code  = 'E_TCP_RECORD_CHANNEL_TRANSMIT'
       error.cause = 'Socket is not writable'
       // Define the socket property on the error object as non-enumerable.
       Object.defineProperty(error, 'socket', { value: socket })

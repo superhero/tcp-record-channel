@@ -26,7 +26,7 @@ suite('@superhero/tcp-record-channel', async () =>
       port          = serverSocket.address().port,
       clientChannel = new Channel(),
       clientConfig  = { ca:rootCA.cert, host, port },
-      clientSocket  = clientChannel.createTlsClient(clientConfig)
+      clientSocket  = await clientChannel.createTlsClient(clientConfig)
 
     clientChannel.transmit(clientSocket, [ 'client', 'test', '123' ])
     const clientRecord = await new Promise((resolve) => serverChannel.on('record', resolve))
@@ -58,7 +58,7 @@ suite('@superhero/tcp-record-channel', async () =>
         port          = serverSocket.address().port,
         clientChannel = new Channel(),
         clientConfig  = { cert:clientChain, key:clientLeaf.key, ca:rootCA.cert, host, port },
-        clientSocket  = clientChannel.createTlsClient(clientConfig)
+        clientSocket  = await clientChannel.createTlsClient(clientConfig)
   
       clientChannel.transmit(clientSocket, [ 'client', 'test', '123' ])
       const clientRecord = await new Promise((resolve) => serverChannel.on('record', resolve))
@@ -82,16 +82,18 @@ suite('@superhero/tcp-record-channel', async () =>
           serverConfig  = { cert:serverChain, key:serverLeaf.key, requestCert:true },
           serverChannel = new Channel(),
           serverSocket  = serverChannel.createTlsServer(serverConfig)
-          
+
         assert.ok(serverSocket)
         await new Promise((resolve) => serverSocket.listen(resolve))
 
         const
           port          = serverSocket.address().port,
           clientConfig  = { cert:clientChain, key:clientLeaf.key, ca:rootCA.cert, host, port },
-          clientChannel = new Channel()
+          clientChannel = new Channel(),
+          socketClient  = await clientChannel.createTlsClient(clientConfig)
 
-        setImmediate(() => clientChannel.createTlsClient(clientConfig))
+        assert.ok(socketClient.authorized, 'Server is authorized')
+
         await new Promise((resolve) => serverSocket.on('tlsClientError', (error) => 
         {
           assert.equal(error.code, 'ECONNRESET')
@@ -101,7 +103,7 @@ suite('@superhero/tcp-record-channel', async () =>
         serverSocket.close()
       })
   
-      test('Missing Server CA', async () =>
+      test('Missing Server Intermediate CA', async () =>
       {
         const 
           serverConfig  = { cert:serverLeaf.cert, key:serverLeaf.key, ca:rootCA.cert },
@@ -114,14 +116,16 @@ suite('@superhero/tcp-record-channel', async () =>
         const
           port          = serverSocket.address().port,
           clientConfig  = { cert:clientChain, key:clientLeaf.key, ca:rootCA.cert, host, port },
-          clientChannel = new Channel(),
-          clientSocket  = clientChannel.createTlsClient(clientConfig)
+          clientChannel = new Channel()
 
-        await new Promise((resolve) => clientSocket.on('error', (error) => 
-        {
-          assert.equal(error.code, 'UNABLE_TO_VERIFY_LEAF_SIGNATURE')
-          resolve()
-        }))
+        await assert.rejects(
+          clientChannel.createTlsClient(clientConfig),
+          (error) => 
+          {
+            assert.equal(error.code, 'E_TCP_RECORD_CHANNEL_CLIENT_CONNECT')
+            assert.equal(error.cause.code, 'UNABLE_TO_VERIFY_LEAF_SIGNATURE')
+            return true
+          })
 
         serverSocket.close()
       })
@@ -139,9 +143,11 @@ suite('@superhero/tcp-record-channel', async () =>
         const
           port          = serverSocket.address().port,
           clientConfig  = { cert:clientChain, key:clientLeaf.key, ca:rootCA.cert, host, port },
-          clientChannel = new Channel()
+          clientChannel = new Channel(),
+          clientSocket  = await clientChannel.createTlsClient(clientConfig)
 
-        setImmediate(() => clientChannel.createTlsClient(clientConfig))
+        assert.ok(clientSocket.authorized)
+
         await new Promise((resolve) => serverSocket.on('secureConnection', (clientSocket) => 
         {
           assert.equal(clientSocket.authorized, false)
@@ -165,7 +171,7 @@ suite('@superhero/tcp-record-channel', async () =>
           port          = serverSocket.address().port,
           clientConfig  = { cert:clientChain, key:clientLeaf.key, ca:rootCA.cert, host, port },
           clientChannel = new Channel(),
-          clientSocket  = clientChannel.createTlsClient(clientConfig)
+          clientSocket  = await clientChannel.createTlsClient(clientConfig)
 
         await new Promise((resolve) => clientSocket.on('close', resolve))
 
@@ -190,16 +196,16 @@ suite('@superhero/tcp-record-channel', async () =>
       {
         const
           clientConfig  = { cert:clientChain, key:clientLeaf.key, host, port },
-          clientChannel = new Channel(),
-          clientSocket  = clientChannel.createTlsClient(clientConfig)
-    
-        assert.ok(clientSocket)
-  
-        await new Promise((resolve) => clientSocket.on('error', (error) => 
-        {
-          assert.equal(error.code, 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY')
-          resolve()
-        }))
+          clientChannel = new Channel()
+
+        await assert.rejects(
+          clientChannel.createTlsClient(clientConfig),
+          (error) => 
+          {
+            assert.equal(error.code, 'E_TCP_RECORD_CHANNEL_CLIENT_CONNECT')
+            assert.equal(error.cause.code, 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY')
+            return true
+          })
       })
   
       test('Missing client CA in the client certificate chain', async () =>
@@ -207,7 +213,7 @@ suite('@superhero/tcp-record-channel', async () =>
         const
           clientConfig  = { cert:clientLeaf.cert, key:clientLeaf.key, ca:rootCA.cert, host, port },
           clientChannel = new Channel(),
-          clientSocket  = clientChannel.createTlsClient(clientConfig)
+          clientSocket  = await clientChannel.createTlsClient(clientConfig)
 
         assert.ok(clientSocket)
 
@@ -218,16 +224,16 @@ suite('@superhero/tcp-record-channel', async () =>
       {
         const
           clientConfig  = { cert:clientChain, key:clientLeaf.key, host, port },
-          clientChannel = new Channel(),
-          clientSocket  = clientChannel.createTlsClient(clientConfig)
-    
-        assert.ok(clientSocket)
-  
-        await new Promise((resolve) => clientSocket.on('error', (error) => 
-        {
-          assert.equal(error.code, 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY')
-          resolve()
-        }))
+          clientChannel = new Channel()
+
+        await assert.rejects(
+          clientChannel.createTlsClient(clientConfig),
+          (error) => 
+          {
+            assert.equal(error.code, 'E_TCP_RECORD_CHANNEL_CLIENT_CONNECT')
+            assert.equal(error.cause.code, 'UNABLE_TO_GET_ISSUER_CERT_LOCALLY')
+            return true
+          })
       })
     })
   })
