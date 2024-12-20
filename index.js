@@ -27,9 +27,10 @@ export default class Channel extends EventEmitter
 
     config = Object.assign(
     {
-      'RECORD_SEPARATOR' : '\x1E',
-      'UNIT_SEPARATOR'   : '\x1F',
-      'KEEP_ALIVE'       : 60e3
+      'START_OF_TRANSMISSION' : '\x02',
+      'RECORD_SEPARATOR'      : '\x1E',
+      'UNIT_SEPARATOR'        : '\x1F',
+      'KEEP_ALIVE'            : 60e3
     }, config)
 
     this.config = config
@@ -67,6 +68,7 @@ export default class Channel extends EventEmitter
       socket.on('data', this.buffer.bind(this, socket))
       socket.setKeepAlive(true, this.config.KEEP_ALIVE)
       socket.resume()
+      this.#transmit(socket, this.config.START_OF_TRANSMISSION)
     }
     else
     {
@@ -80,26 +82,7 @@ export default class Channel extends EventEmitter
    */
   createTlsClient(config)
   {
-    return new Promise((accept, reject) =>
-    {
-      const socket = tls.connect(config)
-      this.init(socket)
-
-      socket.setKeepAlive(true, this.config.KEEP_ALIVE)
-      socket.on('data', this.buffer.bind(this, socket))
-      socket.once('error', (reason) =>
-      {
-        const error = new Error('Could not connect to server')
-        error.code  = 'E_TCP_RECORD_CHANNEL_CLIENT_CONNECT'
-        error.cause = reason
-        reject(error)
-      })
-      socket.once('secureConnect', () => 
-      {
-        socket.removeAllListeners('error')
-        accept(socket)
-      })
-    })
+    return this.#createClient(config, tls.connect)
   }
 
   /**
@@ -108,24 +91,53 @@ export default class Channel extends EventEmitter
    */
   createNetClient(config)
   {
-    new Promise((accept, reject) =>
+    return this.#createClient(config, net.connect)
+  }
+
+  #createClient(config, connect)
+  {
+    return new Promise((accept, reject) =>
     {
-      const socket = net.connect(config)
+      const socket = connect(config)
       this.init(socket)
 
       socket.setKeepAlive(true, this.config.KEEP_ALIVE)
-      socket.on('data', this.buffer.bind(this, socket))
-      socket.once('error', (reason) =>
+
+      socket.once('close', () =>
       {
         const error = new Error('Could not connect to server')
+        error.code  = 'E_TCP_RECORD_CHANNEL_CLIENT_CONNECT'
+        error.cause = new Error('Connection closed before ready')
+        error.cause.code = 'E_TCP_RECORD_CHANNEL_CLOSED_BEFORE_READY'
+        reject(error)
+      })
+      socket.once('error', (reason) =>
+      {
+        const error = new Error('Error when connecting to server')
         error.code  = 'E_TCP_RECORD_CHANNEL_CLIENT_CONNECT'
         error.cause = reason
         reject(error)
       })
-      socket.once('connect', () => 
+      socket.once('data', (buffer) => 
       {
-        socket.removeAllListeners('error')
-        accept(socket)
+        socket.pause()
+        if(this.config.START_OF_TRANSMISSION === buffer.toString())
+        {
+          socket.removeAllListeners('close')
+          socket.removeAllListeners('error')
+          socket.on('data', this.buffer.bind(this, socket))
+          socket.resume()
+          accept(socket)
+        }
+        else
+        {
+          socket.destroy()
+          const error = new Error('Server not ready')
+          error.code  = 'E_TCP_RECORD_CHANNEL_CLIENT_CONNECT'
+          error.cause = new Error(`Invalid ready signal: ${buffer.toString()}`)
+          error.cause.code = 'E_TCP_RECORD_CHANNEL_INVALID_READY_SIGNAL'
+          reject(error)
+        }
       })
     })
   }
@@ -156,7 +168,8 @@ export default class Channel extends EventEmitter
   }
 
   /**
-   * Generates the buffered units of the record once the record separator is found in the buffer.
+   * Generates the buffered units of the record once the record separator 
+   * is found in the buffer.
    * 
    * @param {tls.TLSSocket} socket
    * @param {Buffer} buffer

@@ -89,16 +89,16 @@ suite('@superhero/tcp-record-channel', async () =>
         const
           port          = serverSocket.address().port,
           clientConfig  = { cert:clientChain, key:clientLeaf.key, ca:rootCA.cert, host, port },
-          clientChannel = new Channel(),
-          socketClient  = await clientChannel.createTlsClient(clientConfig)
+          clientChannel = new Channel()
 
-        assert.ok(socketClient.authorized, 'Server is authorized')
-
-        await new Promise((resolve) => serverSocket.on('tlsClientError', (error) => 
-        {
-          assert.equal(error.code, 'ECONNRESET')
-          resolve()
-        }))
+        await assert.rejects(
+          clientChannel.createTlsClient(clientConfig),
+          (error) => 
+          {
+            assert.equal(error.code, 'E_TCP_RECORD_CHANNEL_CLIENT_CONNECT')
+            assert.equal(error.cause.code, 'E_TCP_RECORD_CHANNEL_CLOSED_BEFORE_READY')
+            return true
+          })
 
         serverSocket.close()
       })
@@ -143,16 +143,16 @@ suite('@superhero/tcp-record-channel', async () =>
         const
           port          = serverSocket.address().port,
           clientConfig  = { cert:clientChain, key:clientLeaf.key, ca:rootCA.cert, host, port },
-          clientChannel = new Channel(),
-          clientSocket  = await clientChannel.createTlsClient(clientConfig)
-
-        assert.ok(clientSocket.authorized)
-
-        await new Promise((resolve) => serverSocket.on('secureConnection', (clientSocket) => 
-        {
-          assert.equal(clientSocket.authorized, false)
-          resolve()
-        }))
+          clientChannel = new Channel()
+          
+        await assert.rejects(
+          clientChannel.createTlsClient(clientConfig),
+          (error) => 
+          {
+            assert.equal(error.code, 'E_TCP_RECORD_CHANNEL_CLIENT_CONNECT')
+            assert.equal(error.cause.code, 'E_TCP_RECORD_CHANNEL_CLOSED_BEFORE_READY')
+            return true
+          })
 
         serverSocket.close()
       })
@@ -170,10 +170,16 @@ suite('@superhero/tcp-record-channel', async () =>
         const
           port          = serverSocket.address().port,
           clientConfig  = { cert:clientChain, key:clientLeaf.key, ca:rootCA.cert, host, port },
-          clientChannel = new Channel(),
-          clientSocket  = await clientChannel.createTlsClient(clientConfig)
-
-        await new Promise((resolve) => clientSocket.on('close', resolve))
+          clientChannel = new Channel()
+          
+        await assert.rejects(
+          clientChannel.createTlsClient(clientConfig),
+          (error) => 
+          {
+            assert.equal(error.code, 'E_TCP_RECORD_CHANNEL_CLIENT_CONNECT')
+            assert.equal(error.cause.code, 'E_TCP_RECORD_CHANNEL_CLOSED_BEFORE_READY')
+            return true
+          })
 
         serverSocket.close()
       })
@@ -212,12 +218,16 @@ suite('@superhero/tcp-record-channel', async () =>
       {
         const
           clientConfig  = { cert:clientLeaf.cert, key:clientLeaf.key, ca:rootCA.cert, host, port },
-          clientChannel = new Channel(),
-          clientSocket  = await clientChannel.createTlsClient(clientConfig)
-
-        assert.ok(clientSocket)
-
-        await new Promise((resolve) => clientSocket.on('close', resolve))
+          clientChannel = new Channel()
+          
+        await assert.rejects(
+          clientChannel.createTlsClient(clientConfig),
+          (error) => 
+          {
+            assert.equal(error.code, 'E_TCP_RECORD_CHANNEL_CLIENT_CONNECT')
+            assert.equal(error.cause.code, 'E_TCP_RECORD_CHANNEL_CLOSED_BEFORE_READY')
+            return true
+          })
       })
   
       test('Missing Root CA in the client', async () =>
