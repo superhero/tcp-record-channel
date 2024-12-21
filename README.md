@@ -26,7 +26,7 @@ npm install @superhero/tcp-record-channel
 import Channel from '@superhero/tcp-record-channel';
 
 const serverChannel = new Channel();
-const serverConfig = { cert: 'path/to/cert.pem', key: 'path/to/key.pem', ca: 'path/to/ca.pem' };
+const serverConfig  = { cert: 'path/to/cert.pem', key: 'path/to/key.pem', ca: 'path/to/ca.pem' };
 
 const server = serverChannel.createTlsServer(serverConfig, (clientSocket) => {
   clientSocket.authorized = true;
@@ -44,9 +44,8 @@ serverChannel.on('record', (record, socket) => {
 import Channel from '@superhero/tcp-record-channel';
 
 const clientChannel = new Channel();
-const clientConfig = { host: 'localhost', port: 443, ca: 'path/to/ca.pem' };
-
-const clientSocket = clientChannel.createTlsClient(clientConfig);
+const clientConfig  = { host: 'localhost', port: 443, ca: 'path/to/ca.pem' };
+const clientSocket  = await clientChannel.createTlsClient(clientConfig);
 
 clientChannel.transmit(clientSocket, ['example', 'data', '123']);
 
@@ -59,11 +58,12 @@ clientChannel.on('record', (record) => {
 
 The `Channel` constructor accepts an optional configuration object:
 
-| Option             | Default Value | Description                             |
-|--------------------|---------------|-----------------------------------------|
-| `RECORD_SEPARATOR` | `\x1E`        | ASCII character to separate records.    |
-| `UNIT_SEPARATOR`   | `\x1F`        | ASCII character to separate units.      |
-| `KEEP_ALIVE`       | `60000` ms    | Keep-alive interval in milliseconds.    |
+| Option                  | Default Value | Description                              |
+|-------------------------|---------------|------------------------------------------|
+| `START_OF_TRANSMISSION` | `\x02`        | ASCII character to indicate ready state. |
+| `RECORD_SEPARATOR`      | `\x1E`        | ASCII character to separate records.     |
+| `UNIT_SEPARATOR`        | `\x1F`        | ASCII character to separate units.       |
+| `KEEP_ALIVE`            | `60000`       | Keep-alive interval in milliseconds.     |
 
 ### API
 

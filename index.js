@@ -17,9 +17,10 @@ export default class Channel extends EventEmitter
    * Default to ASCII Delimited Encoding.
    * 
    * @param {Object} [config]
-   * @param {string} [config.RECORD_SEPARATOR]  default: '\x1E'
-   * @param {string} [config.UNIT_SEPARATOR]    default: '\x1F'
-   * @param {number} [config.KEEP_ALIVE]        default: 60e3
+   * @param {string} [config.START_OF_TRANSMISSION] default: '\x02'
+   * @param {string} [config.RECORD_SEPARATOR]      default: '\x1E'
+   * @param {string} [config.UNIT_SEPARATOR]        default: '\x1F'
+   * @param {number} [config.KEEP_ALIVE]            default: 60e3
    */
   constructor(config)
   {
