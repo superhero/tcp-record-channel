@@ -106,14 +106,28 @@ export default class Channel extends EventEmitter
 
       socket.once('close', () =>
       {
+        socket.removeAllListeners()
+        socket.destroy()
         const error = new Error('Could not connect to server')
         error.code  = 'E_TCP_RECORD_CHANNEL_CLIENT_CONNECT'
         error.cause = new Error('Connection closed before ready')
         error.cause.code = 'E_TCP_RECORD_CHANNEL_CLOSED_BEFORE_READY'
         reject(error)
       })
+      socket.once('timeout', () =>
+      {
+        socket.removeAllListeners()
+        socket.destroy()
+        const error = new Error('Could not connect to server')
+        error.code  = 'E_TCP_RECORD_CHANNEL_CLIENT_CONNECT'
+        error.cause = new Error('Connection timeout before ready')
+        error.cause.code = 'E_TCP_RECORD_CHANNEL_TIMEOUT_BEFORE_READY'
+        reject(error)
+      })
       socket.once('error', (reason) =>
       {
+        socket.removeAllListeners()
+        socket.destroy()
         const error = new Error('Error when connecting to server')
         error.code  = 'E_TCP_RECORD_CHANNEL_CLIENT_CONNECT'
         error.cause = reason
@@ -121,11 +135,10 @@ export default class Channel extends EventEmitter
       })
       socket.once('data', (buffer) => 
       {
+        socket.removeAllListeners()
         socket.pause()
         if(this.config.START_OF_TRANSMISSION === buffer.toString())
         {
-          socket.removeAllListeners('close')
-          socket.removeAllListeners('error')
           socket.on('data', this.buffer.bind(this, socket))
           socket.resume()
           accept(socket)
