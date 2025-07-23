@@ -1,6 +1,6 @@
 {
   "name": "@superhero/tcp-record-channel",
-  "version": "4.7.14",
+  "version": "4.7.15",
   "description": "TCP record channel is intended to be used as a low level bidirectional TCP socket communication server-to-server",
   "keywords": [
     "TCP",
@@ -20,9 +20,9 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "@superhero/audit": "4.7.14",
+    "@superhero/audit": "4.7.15",
     "@superhero/syntax-check": "0.0.2",
-    "@superhero/openssl": "4.7.14"
+    "@superhero/openssl": "4.7.15"
   },
   "author": {
     "name": "Erik Landvall",
